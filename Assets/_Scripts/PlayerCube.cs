@@ -5,8 +5,6 @@ using UnityEngine.UI; // For UI Slider support
 
 public class PlayerCube : MonoBehaviour
 {
-    public LayerMask obstacleMask;
-
     [Header("Movement Variables")]
     [Tooltip("Player's horizontal movement speed.")]
     public float HoMoveSpeed = 5f;                  // Player's horizontal movement speed.
@@ -20,6 +18,18 @@ public class PlayerCube : MonoBehaviour
     public GameObject indicatorPrefab;              // Indicator prefab.
     [Tooltip("Distance to spawn ice platform.")]
     public float spawnDistance = 10f;               // Distance ice platform will spawn.
+    [Tooltip("Audio Source for ice platform placing sound.")]
+    public AudioSource iceSound;
+    [Tooltip("Cooldown for placing platforms. (in seconds)")]
+    public float platformCooldown = 1f;
+    private float cooldownTimer;
+    [Tooltip("Cooldown for refilling platform ammo. (in seconds)")]
+    public float refillCooldown = 3f;
+    private float refillTimer;
+    private bool refill = false;
+    [Tooltip("Max number of ice platforms.")]
+    public const int maxPlatforms = 5;
+    private int platformNumber;
 
     [Header("Dynamic")]
     public GameObject indicator;                    // For indicator prefab.
@@ -38,6 +48,8 @@ public class PlayerCube : MonoBehaviour
     [Tooltip("Place slider for air here.")]
     public Slider oxygenSlider;                     // Slider for oxygen display
     private bool isUnderwater = false;
+    [Tooltip("Place player's head collider here.")]
+    public GameObject playerHead;
 
     private Rigidbody rb;                           // Player's rigid body.
     private Vector3 mvmt;                           // Vector for player movement direction. (Positive means the player is moving right, negative is left)
@@ -67,10 +79,22 @@ public class PlayerCube : MonoBehaviour
             oxygenSlider.maxValue = maxAir;
             oxygenSlider.value = currentAir;
         }
+
+        // Initialize timers
+        cooldownTimer = platformCooldown;
+        refillTimer = refillCooldown;
+
+        // Initialize platform capacity
+        platformNumber = maxPlatforms;
     }
 
     void Update()
     {
+        if (cooldownTimer > 0f)
+        {
+            cooldownTimer -= Time.deltaTime;
+        }
+
         mvmt.x = Input.GetAxisRaw("Horizontal");
         bool canJump = Mathf.Abs(rb.velocity.y) < 0.01f;
 
@@ -90,9 +114,31 @@ public class PlayerCube : MonoBehaviour
         Vector3 placementPos = playerPos + mouseDelta;
         indicator.transform.position = placementPos;
 
-        if (Input.GetMouseButtonDown(0) && CanPlacePlatform(placementPos, GetSize(icePlatformPrefab)))
+        if (Input.GetMouseButtonDown(0) && cooldownTimer <= 0f && !refill)
         {
             Instantiate(icePlatformPrefab, placementPos, Quaternion.identity);
+            iceSound.Play();
+            cooldownTimer = platformCooldown;
+            platformNumber--;   // Decrement platform number
+        }
+
+        // Check for platform capacity and reload if needed
+        if(Input.GetKey(KeyCode.R) || platformNumber == 0 || refill)
+        {
+            Debug.Log("reloading");
+            refill = true;
+
+            if (refillTimer > 0f)
+            {
+                refillTimer -= Time.deltaTime;
+            }
+            else
+            {
+                Debug.Log("finished reloading");
+                refillTimer = refillCooldown;   // Reset refill timer
+                platformNumber = maxPlatforms;  // Reset platforms
+                refill = false;
+            }
         }
 
         // Handle oxygen decrease or increase
@@ -173,7 +219,7 @@ public class PlayerCube : MonoBehaviour
     {
         Debug.Log($"Entered Trigger: {collision.name}");
 
-        if (collision.CompareTag("Water"))
+        if (collision.CompareTag("Water") && playerHead.GetComponent<Collider>().bounds.Intersects(collision.bounds))
         {
             isUnderwater = true;
             Debug.Log("Player is underwater.");
@@ -184,17 +230,11 @@ public class PlayerCube : MonoBehaviour
     {
         Debug.Log($"Exited Trigger: {collision.name}");
 
-        if (collision.CompareTag("Water"))
+        if (collision.CompareTag("Water") && !playerHead.GetComponent<Collider>().bounds.Intersects(collision.bounds))
         {
             isUnderwater = false;
             Debug.Log("Player exited water.");
         }
-    }
-
-    public bool CanPlacePlatform(Vector3 pos, Vector3 platformSize)
-    {
-        Collider[] colliders = Physics.OverlapBox(pos, platformSize / 2, Quaternion.identity, obstacleMask);
-        return colliders.Length == 0;
     }
 
     Vector3 GetSize(GameObject prefab)
