@@ -7,7 +7,6 @@ public class Music : MonoBehaviour
 {
     public GameObject PlayerCube;
     public GameObject Water;
-    public GameObject EndCube;
 
     public double musicDuration;
     public double goalTime;
@@ -55,12 +54,12 @@ public class Music : MonoBehaviour
             }
         }
 
-        // Determine Game end state
-        Collider EndCollider = EndCube.GetComponent<Collider>();
-
-        if (PlayerCollider.bounds.Intersects(EndCollider.bounds))
+        // Determine Game end state FIX LATER
+        float playerY = PlayerCube.transform.position.y;
+        if (playerY >= 42.0)
         {
             gameEnd = true;
+            Debug.Log("GameOver");
         }
     }
 
